@@ -14,7 +14,10 @@
 
 # BUILD file for Project Trellis.
 
-load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_library", "pybind_extension")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
 
 package(
     features = [
@@ -80,6 +83,23 @@ HDRS = glob(
     "libtrellis/tools/wasmexcept.hpp",
 ]
 
+pybind_extension(
+    name = "pytrellis",
+    deps = DEPS,
+    srcs = HDRS + glob([
+        "libtrellis/src/*.cpp",
+    ]) + [
+        "libtrellis/generated/version.cpp",
+    ],
+    copts = COPTS,
+    data = ["@prjtrellis_db//:files"],
+    defines = [
+        "INCLUDE_PYTHON=1",
+    ],
+    includes = INCLUDES,
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "prjtrellis",
     srcs = glob([
@@ -91,35 +111,22 @@ py_library(
         "timing/util",
         "util/common",
     ],
-    data = [":pytrellis.so"],
-)
-
-pybind_library(
-    name = "pytrellis",
-    deps = DEPS,
-    srcs = HDRS + glob([
-        "libtrellis/src/*.cpp",
-    ]) + [
-        "libtrellis/generated/version.cpp",
-    ],
-    data = ["@prjtrellis_db//:files"],
-    defines = [
-        "INCLUDE_PYTHON",
-    ],
-    includes = INCLUDES,
-    visibility = ["//visibility:public"],
-)
-
-cc_binary(
-    name = "pytrellis.so",
-    copts = COPTS + ["-fvisibility=hidden"],
-    features = ["-parse_headers"],
-    linkopts = ["-Wl,-Bsymbolic"],
     deps = [
-        ":pytrellis",
-    ],
-    linkshared = 1,
+        ":pytrellis"
+    ]
 )
+
+py_test(
+    name = "prjtrellis_smoke_test",
+    main = "prjtrellis_smoke_test.py",
+    srcs = [
+        "prjtrellis_smoke_test.py",
+    ],
+    deps = [
+        ":pytrellis.so",
+    ]
+)
+
 TOOLS = [
     "ecpbram",
     "ecppack",
